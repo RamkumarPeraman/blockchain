@@ -1,1 +1,69 @@
-blockchain
+const { Console } = require('console');
+const crypto = require('crypto');
+//hash function
+const hash =(data) =>{
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+//creation of new node
+class CreateNode{
+  constructor(data){
+    this.data = data;
+    this.left = null;
+    this.right = null;
+  }
+}
+//build merkle tree
+class MerkleTree{
+  createNode(data){
+    let nodes = [];
+    for(let i = 0; i < data.length; i++){
+      nodes.push(new CreateNode(hash(data[i])));
+    }
+    // if(nodes.length === 1){
+    //  return (`root -> ${hash(data[0])}`) 
+    // }
+      while(nodes.length > 1){
+        if(nodes.length % 2 === 1){
+           nodes.push(new CreateNode(nodes[nodes.length - 1]).data);
+        }
+        let newNodes = [];
+        for(let i = 0; i < nodes.length; i+=2){
+          const levelNext = new CreateNode(hash(nodes[i].data + nodes[i+1].data));
+          levelNext.left = nodes[i];
+          levelNext.right = nodes[i+1];
+          newNodes.push(levelNext);
+        }
+        nodes = newNodes;
+      }
+      console.log(`root -> ${nodes[0].data}`);
+      return nodes[0];
+  }
+  Traversal(node,Newdata){
+    if(node){
+      if(node.data === Newdata){
+        console.log(`Searching data found: -> ${node.data}`);
+        f = 1;
+      }
+      this.Traversal(node.left,Newdata);
+      this.Traversal(node.right,Newdata);
+    }
+  }
+}
+const merkle = new MerkleTree();
+// const data = ['data1', 'data2', 'data3', 'data4', 'data5'];
+const data = ['hii'];
+let rootNode =  merkle.createNode(data);
+let f = 0;
+let g = 'hii';
+let Newdata = hash(g);
+console.log(`Searching data: ${Newdata}`);
+merkle.Traversal(rootNode,Newdata);
+if(f===1){
+  console.log(`${g} is verified`);
+}
+else{
+  console.log(`${g} is not in the tree`);
+}
+
+
+
