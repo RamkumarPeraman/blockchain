@@ -1,69 +1,146 @@
-const { Console } = require('console');
-const crypto = require('crypto');
-//hash function
-const hash =(data) =>{
+const crypto = require('crypto'); //import from crypto
+
+// Hash function
+const hash = (data) => {
   return crypto.createHash('sha256').update(data).digest('hex');
-}
-//creation of new node
-class CreateNode{
-  constructor(data){
+};
+
+// Create a new node
+class MerkleNode {
+  constructor(data) {
     this.data = data;
     this.left = null;
     this.right = null;
   }
 }
-//build merkle tree
+
+let treeMerkle = []; //Empty array for storing the tree
+
+// Build Merkle tree
 class MerkleTree{
   createNode(data){
     let nodes = [];
-    for(let i = 0; i < data.length; i++){
-      nodes.push(new CreateNode(hash(data[i])));
+    for(let i=0;i<data.length;i++){
+      nodes.push(new MerkleNode(hash(data[i])));
     }
-    // if(nodes.length === 1){
-    //  return (`root -> ${hash(data[0])}`) 
-    // }
-      while(nodes.length > 1){
-        if(nodes.length % 2 === 1){
-           nodes.push(new CreateNode(nodes[nodes.length - 1]).data);
-        }
-        let newNodes = [];
-        for(let i = 0; i < nodes.length; i+=2){
-          const levelNext = new CreateNode(hash(nodes[i].data + nodes[i+1].data));
-          levelNext.left = nodes[i];
-          levelNext.right = nodes[i+1];
-          newNodes.push(levelNext);
-        }
-        nodes = newNodes;
+    while(nodes.length >1){
+      treeMerkle.push(nodes); // store the node until before root i
+      if(nodes.length % 2 === 1){
+        nodes.push(new MerkleNode(nodes[nodes.length - 1].data));
       }
-      console.log(`root -> ${nodes[0].data}`);
-      return nodes[0];
+      let newNodes = []; 
+      for(let i = 0; i <nodes.length;i+=2){ 
+        const iNext = new MerkleNode(hash(nodes[i].data + nodes[i+1].data)); //concadinate the nodes
+        iNext.left = nodes[i];
+        iNext.right = nodes[i + 1];
+        newNodes.push(iNext);
+      }
+      nodes = newNodes;
+    }
+    treeMerkle.push(nodes);
   }
-  Traversal(node,Newdata){
-    if(node){
-      if(node.data === Newdata){
-        console.log(`Searching data found: -> ${node.data}`);
-        f = 1;
+  searchNode(root, newData){
+    if(root){
+      if(root.data === newData){
+        console.log(`Searching data found: -> ${root.data}`);
+        return true;  //root data is search data
       }
-      this.Traversal(node.left,Newdata);
-      this.Traversal(node.right,Newdata);
+      return this.searchNode(root.left, newData) || this.searchNode(root.right, newData); //traverse right and left
+    }
+    return false;
+  }
+  displayTree(root, gap = 0){ // gap for space of every is
+    if (root){
+      console.log(' '.repeat(gap * 5) + `-->: ${root.data}`);
+      this.displayTree(root.left, gap + 1);
+      this.displayTree(root.right, gap + 1);
     }
   }
-}
-const merkle = new MerkleTree();
-// const data = ['data1', 'data2', 'data3', 'data4', 'data5'];
-const data = ['hii'];
-let rootNode =  merkle.createNode(data);
-let f = 0;
-let g = 'hii';
-let Newdata = hash(g);
-console.log(`Searching data: ${Newdata}`);
-merkle.Traversal(rootNode,Newdata);
-if(f===1){
-  console.log(`${g} is verified`);
-}
-else{
-  console.log(`${g} is not in the tree`);
+
+  searchMerkleProof(data){
+    const proof = []; //empty array for storing the filtered siblings
+    let di = -1; // store data index value
+    for(let i = 0; i < treeMerkle[0].length;i++){
+      if(treeMerkle[0][i].data ===  data){
+        di = i;  // For this tree '2' in data index
+        break;
+      }
+    }
+
+    if(di === -1){
+      console.log(`Data not found in the Merkle tree`);
+      return null;
+    }
+    for (let i=0; i <treeMerkle.length-1;i++) {
+      const sib_i = di % 2 === 0 ? di+1 : di-1;
+      const direction = di % 2 === 0 ? 'right' : 'left';
+      const sib_d = treeMerkle[i][sib_i].data; //data4
+      proof.push({
+        direction: direction,
+        data: sib_d, 
+      });
+      di = Math.floor(di / 2);
+    }
+    return proof;//[{data4,right},{data12,left}]
+  }
+
+  verifyMerkleProof(data, proof) {
+    let hr = data;
+    for (let i = 0; i < proof.length; i++){ 
+      const pi = proof[i]; //store the nodes
+      const direction = pi.direction; // store the node direction
+      const sib_d = pi.data;
+      if (direction === 'left') {
+        hr = hash(sib_d + hr);
+      } else {
+        hr = hash(hr + sib_d);
+      }
+    }
+    return hr === treeMerkle[treeMerkle.length - 1][0].data;  //it returns true if it equal
+  }
 }
 
 
+// Main 
+const merkle = new MerkleTree();  //create a object for the merkle class
+const data = ['data1', 'data2', 'data3', 'data4']; // data(input)
+merkle.createNode(data);// call the createNode function
+
+console.log(`-------------------------------`);
+console.log("\nMerkle Tree:");
+merkle.displayTree(treeMerkle[treeMerkle.length - 1][0]); //call the displayTree function
+
+console.log(`-------------------------------`);
+
+const searchData = 'data4'; // search for data verification
+const searchDataHash = hash(searchData); //hash the search data
+
+console.log(`Searching data: ${searchDataHash}`); 
+console.log(`-------------------------------`);
+console.log("\n");
+const foundNode = merkle.searchNode(treeMerkle[treeMerkle.length - 1][0], searchDataHash); //store the traversal(search) data in tree
+if (foundNode){
+  console.log(`${searchData} is verified in the tree`); // if data is found
+} else {
+  console.log(`${searchData} is not in the tree`);// data is not found
+}
+
+console.log(`-------------------------------`);
+
+const merkleProof = merkle.searchMerkleProof(searchDataHash); // search the merkle proof
+
+if (merkleProof) {
+  console.log(`MerkleTree Proof for '${searchData}':`); //if 
+  console.log(merkleProof);
+  console.log(`-------------------------------`);
+
+  const isVerified = merkle.verifyMerkleProof(searchDataHash, merkleProof); //verify merkle proof
+
+  if(isVerified){
+    console.log(`${searchData} is verified`); //if verified
+  } 
+  else{
+    console.log(`${searchData} verification failed`);//not verified
+  }
+}
 
